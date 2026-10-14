@@ -1,0 +1,17 @@
+{
+  "name": "apl-si",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "APL-SI: a compact array notation shared by people and machines. v0 core.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "demo": "node src/demo.mjs",
+    "repl": "node src/repl.mjs",
+    "echo": "node examples/echo.mjs"
+  },
+  "license": "MIT"
+}
