@@ -43,10 +43,10 @@ const defaultIO = {
 // ---------------------------------------------------------------------------
 // Frozen core
 // ---------------------------------------------------------------------------
-// Ten glyphs. Do not grow this list casually: the core is what both sides
+// The core glyphs. Do not grow this list casually: the core is what both sides
 // agree on. Everything else is built on top and proven by tests.
 
-export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞'];
+export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞', '⍴'];
 
 // Glyphs that take no argument: they are complete on their own. The ear listens.
 const NILADIC = ['⍞'];
@@ -63,6 +63,7 @@ export const CORE = {
   '*': ['exponential', 'power'],
   '⍳': ['index generator (1..n)', null],
   '≢': ['tally (count)', null],
+  '⍴': ['shape', 'reshape'],
   '◆': ['prefix sums (running total)', null], // not standard APL: this one is ours
   '⎕': ['print (the mouth)', null], // our first effect: it writes to the screen
   '⍞': ['read a line (the ear)', null], // our second effect: it takes one in from outside
@@ -361,6 +362,9 @@ function applyDfn(def, a, b, env, io) {
 }
 
 function applyDyad(fn, a, b) {
+  // Reshape is structural: it changes the shape of the data, not its values, so
+  // it does not go through the scalar-extension path the arithmetic glyphs use.
+  if (fn === '⍴') return reshape(a, b);
   if (typeof a === 'string' || typeof b === 'string') {
     throw new Error('APL-SI: arithmetic on text is not defined yet');
   }
@@ -404,6 +408,7 @@ function applyMonad(fn, v, io) {
     return Array.from({ length: n }, (_, i) => i + 1);
   }
   if (fn === '≢') return typeof v === 'string' ? [...v].length : toVec(v).length;
+  if (fn === '⍴') return shape(v);
   if (fn === '◆') {
     if (!isVec(v)) return v;
     let acc = 0;
@@ -425,6 +430,50 @@ function scalarMonad(fn, x) {
     case '|': return Math.abs(x);
     default: throw new Error(`APL-SI: "${fn}" is not a monadic function`);
   }
+}
+
+// ⍴ monadic: the shape of a value, itself an array. A vector's shape is a
+// one-element array holding its length; a scalar's shape is the empty array.
+// So ≢ ⍴ x is the rank: 1 for a vector, 0 for a scalar. A string is an array of
+// characters, so its shape is its character count. Shape is deliberately an
+// array rather than a bare number: it is what lets a matrix have a two-element
+// shape later without ⍴ ever changing meaning.
+function shape(v) {
+  if (isDfn(v)) throw new Error('APL-SI: ⍴ expects an array, not a word');
+  if (typeof v === 'string') return [[...v].length];
+  if (isVec(v)) return [v.length];
+  return [];
+}
+
+// ⍴ dyadic: the left argument is the shape to make, the right is the data to
+// fill it with. v0 is one-dimensional, so the shape is a scalar (or a
+// one-element array, the same thing written the long way); a longer shape would
+// describe a matrix, which needs nested arrays v0 does not have. Data is reused
+// cyclically, the way APL reshapes: 5 ⍴ 1 2 3 is 1 2 3 1 2.
+function reshape(shapeArg, data) {
+  if (isDfn(data)) throw new Error('APL-SI: ⍴ expects an array, not a word');
+
+  let n = shapeArg;
+  if (isVec(shapeArg)) {
+    if (shapeArg.length !== 1) {
+      throw new Error('APL-SI: ⍴ reshape to a higher rank needs nested arrays, which v0 does not have');
+    }
+    n = shapeArg[0];
+  }
+  if (typeof n !== 'number') throw new Error('APL-SI: ⍴ shape must be a number');
+  n = Math.trunc(n);
+  if (n < 0) throw new Error('APL-SI: ⍴ shape must not be negative');
+
+  if (typeof data === 'string') {
+    const chars = [...data];
+    if (n > 0 && chars.length === 0) throw new Error('APL-SI: cannot reshape an empty array');
+    if (n === 0) return '';
+    return Array.from({ length: n }, (_, i) => chars[i % chars.length]).join('');
+  }
+
+  const src = toVec(data);
+  if (n > 0 && src.length === 0) throw new Error('APL-SI: cannot reshape an empty array');
+  return Array.from({ length: n }, (_, i) => src[i % src.length]);
 }
 
 function reduce(fn, vec) {
