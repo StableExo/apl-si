@@ -311,3 +311,39 @@ test(', and ⍴ fit together', () => {
   assert.deepEqual(run('3 ⍴ 1 , 2'), [1, 2, 1]); // build a pair, then reshape it
 });
 
+// --- the index: ⌷ reaches one element back out of an array ---
+//
+// , and ⍴ build arrays; ⌷ is the way to pull a single value back out. Positions
+// count from one (APL's origin), a negative index counts from the end, and an
+// index outside the array is refused rather than wrapped.
+
+test('⌷ picks one element by position, counting from one', () => {
+  assert.equal(run('1 ⌷ 10 20 30'), 10);
+  assert.equal(run('2 ⌷ 10 20 30'), 20);
+  assert.equal(run('3 ⌷ 10 20 30'), 30);
+});
+
+test('⌷ counts back from the end with a negative index', () => {
+  assert.equal(run('¯1 ⌷ 10 20 30'), 30); // the last element
+  assert.equal(run('¯2 ⌷ 10 20 30'), 20);
+});
+
+test('⌷ picks a character out of text', () => {
+  assert.equal(run("2 ⌷ 'abc'"), 'b');
+});
+
+test('⌷ on a lone value gives that value at position 1', () => {
+  assert.equal(run('1 ⌷ 5'), 5);
+  assert.equal(run('¯1 ⌷ 5'), 5);
+});
+
+test('⌷ refuses an index outside the array', () => {
+  assert.throws(() => run('4 ⌷ 1 2 3'), /out of range/);
+  assert.throws(() => run('0 ⌷ 1 2 3'), /out of range/);
+});
+
+test('⌷ composes with ≢ and ◆', () => {
+  assert.equal(run('¯1 ⌷ ◆ 3 1 4 1 5'), 14); // the final running total, directly
+  assert.equal(run('(≢ 7 8 9) ⌷ 7 8 9'), 9); // the last element, counted
+});
+
