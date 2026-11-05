@@ -70,7 +70,7 @@ export const CORE = {
   '⍞': ['read a line (the ear)', null], // our second effect: it takes one in from outside
 };
 
-// The  operator reduces a vector with the function on its left: +/ ×/ -/ ÷/ ⌈/ ⌊/
+// The `/` operator reduces a vector with the function on its left: +/ ×/ -/ ÷/ ⌈/ ⌊/
 const REDUCE_ALLOWED = ['+', '-', '×', '÷', '⌈', '⌊'];
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ export function tokenize(src) {
       continue;
     }
 
-    throw new Error();
+    throw new Error(`APL-SI: unexpected character "${c}"`);
   }
 
   return tokens;
@@ -307,7 +307,7 @@ function evalTokens(tokens, env, io) {
         if (name === '⍺' && !('⍺' in env)) {
           throw new Error('APL-SI: ⍺ used but this word was called with one argument');
         }
-        if (!(name in env)) throw new Error();
+        if (!(name in env)) throw new Error(`APL-SI: unknown name "${name}"`);
         items.push(env[name]);
         continue;
       }
@@ -340,7 +340,7 @@ function evalTokens(tokens, env, io) {
 
   const value = parseExpr();
   if (pos !== tokens.length) {
-    throw new Error();
+    throw new Error(`APL-SI: unexpected token "${JSON.stringify(tokens[pos])}"`);
   }
   return value;
 }
@@ -376,7 +376,7 @@ function applyDyad(fn, a, b) {
     if (av.length === bv.length) return av.map((x, i) => scalarDyad(fn, x, bv[i]));
     if (av.length === 1) return bv.map((y) => scalarDyad(fn, av[0], y));
     if (bv.length === 1) return av.map((x) => scalarDyad(fn, x, bv[0]));
-    throw new Error();
+    throw new Error(`APL-SI: length mismatch in "${fn}" (${av.length} vs ${bv.length})`);
   }
   return scalarDyad(fn, a, b);
 }
@@ -391,7 +391,7 @@ function scalarDyad(fn, x, y) {
     case '⌊': return Math.min(x, y);
     case '*': return Math.pow(x, y);
     case '|': return ((y % x) + x) % x; // APL residue: a|b is b mod a
-    default: throw new Error();
+    default: throw new Error(`APL-SI: "${fn}" is not a dyadic function`);
   }
 }
 
@@ -431,7 +431,7 @@ function scalarMonad(fn, x) {
     case '⌊': return Math.floor(x);
     case '*': return Math.exp(x);
     case '|': return Math.abs(x);
-    default: throw new Error();
+    default: throw new Error(`APL-SI: "${fn}" is not a monadic function`);
   }
 }
 
@@ -505,7 +505,7 @@ function reduce(fn, vec) {
   if (!isVec(vec)) return vec;
   if (vec.length === 0) throw new Error('APL-SI: cannot reduce an empty vector');
   if (!REDUCE_ALLOWED.includes(fn)) {
-    throw new Error();
+    throw new Error(`APL-SI: "${fn}/" reduce is not defined`);
   }
   let acc = vec[vec.length - 1];
   for (let i = vec.length - 2; i >= 0; i--) acc = scalarDyad(fn, vec[i], acc);
