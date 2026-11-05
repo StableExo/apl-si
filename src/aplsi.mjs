@@ -46,7 +46,7 @@ const defaultIO = {
 // The core glyphs. Do not grow this list casually: the core is what both sides
 // agree on. Everything else is built on top and proven by tests.
 
-export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞', '⍴'];
+export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞', '⍴', ','];
 
 // Glyphs that take no argument: they are complete on their own. The ear listens.
 const NILADIC = ['⍞'];
@@ -64,12 +64,13 @@ export const CORE = {
   '⍳': ['index generator (1..n)', null],
   '≢': ['tally (count)', null],
   '⍴': ['shape', 'reshape'],
+  ',': ['ravel', 'catenate'],
   '◆': ['prefix sums (running total)', null], // not standard APL: this one is ours
   '⎕': ['print (the mouth)', null], // our first effect: it writes to the screen
   '⍞': ['read a line (the ear)', null], // our second effect: it takes one in from outside
 };
 
-// The `/` operator reduces a vector with the function on its left: +/ ×/ -/ ÷/ ⌈/ ⌊/
+// The  operator reduces a vector with the function on its left: +/ ×/ -/ ÷/ ⌈/ ⌊/
 const REDUCE_ALLOWED = ['+', '-', '×', '÷', '⌈', '⌊'];
 
 // ---------------------------------------------------------------------------
@@ -187,7 +188,7 @@ export function tokenize(src) {
       continue;
     }
 
-    throw new Error(`APL-SI: unexpected character "${c}"`);
+    throw new Error();
   }
 
   return tokens;
@@ -306,7 +307,7 @@ function evalTokens(tokens, env, io) {
         if (name === '⍺' && !('⍺' in env)) {
           throw new Error('APL-SI: ⍺ used but this word was called with one argument');
         }
-        if (!(name in env)) throw new Error(`APL-SI: unknown name "${name}"`);
+        if (!(name in env)) throw new Error();
         items.push(env[name]);
         continue;
       }
@@ -339,7 +340,7 @@ function evalTokens(tokens, env, io) {
 
   const value = parseExpr();
   if (pos !== tokens.length) {
-    throw new Error(`APL-SI: unexpected token "${JSON.stringify(tokens[pos])}"`);
+    throw new Error();
   }
   return value;
 }
@@ -365,6 +366,7 @@ function applyDyad(fn, a, b) {
   // Reshape is structural: it changes the shape of the data, not its values, so
   // it does not go through the scalar-extension path the arithmetic glyphs use.
   if (fn === '⍴') return reshape(a, b);
+  if (fn === ',') return catenate(a, b);
   if (typeof a === 'string' || typeof b === 'string') {
     throw new Error('APL-SI: arithmetic on text is not defined yet');
   }
@@ -374,7 +376,7 @@ function applyDyad(fn, a, b) {
     if (av.length === bv.length) return av.map((x, i) => scalarDyad(fn, x, bv[i]));
     if (av.length === 1) return bv.map((y) => scalarDyad(fn, av[0], y));
     if (bv.length === 1) return av.map((x) => scalarDyad(fn, x, bv[0]));
-    throw new Error(`APL-SI: length mismatch in "${fn}" (${av.length} vs ${bv.length})`);
+    throw new Error();
   }
   return scalarDyad(fn, a, b);
 }
@@ -389,7 +391,7 @@ function scalarDyad(fn, x, y) {
     case '⌊': return Math.min(x, y);
     case '*': return Math.pow(x, y);
     case '|': return ((y % x) + x) % x; // APL residue: a|b is b mod a
-    default: throw new Error(`APL-SI: "${fn}" is not a dyadic function`);
+    default: throw new Error();
   }
 }
 
@@ -409,6 +411,7 @@ function applyMonad(fn, v, io) {
   }
   if (fn === '≢') return typeof v === 'string' ? [...v].length : toVec(v).length;
   if (fn === '⍴') return shape(v);
+  if (fn === ',') return ravel(v);
   if (fn === '◆') {
     if (!isVec(v)) return v;
     let acc = 0;
@@ -428,7 +431,7 @@ function scalarMonad(fn, x) {
     case '⌊': return Math.floor(x);
     case '*': return Math.exp(x);
     case '|': return Math.abs(x);
-    default: throw new Error(`APL-SI: "${fn}" is not a monadic function`);
+    default: throw new Error();
   }
 }
 
@@ -476,11 +479,33 @@ function reshape(shapeArg, data) {
   return Array.from({ length: n }, (_, i) => src[i % src.length]);
 }
 
+// , monadic: ravel. It turns a value into a vector. v0 has no nesting, so for a
+// vector it is the vector itself; its real work is lifting a scalar into a
+// one-element vector, which is what makes a lone value joinable: 5 , 6 is 5 6.
+function ravel(v) {
+  if (isDfn(v)) throw new Error('APL-SI: , expects an array, not a word');
+  if (typeof v === 'string') return v; // text is already a flat array of characters
+  return toVec(v);
+}
+
+// , dyadic: catenate. It joins left and right into one vector. Numbers join end
+// to end (1 2 , 3 4 is 1 2 3 4), and text joins to text ('ab' , 'cd' is 'abcd').
+// Text and numbers do not mix in v0: a mixed array has no single meaning here
+// yet, so it is refused rather than guessed at.
+function catenate(a, b) {
+  if (isDfn(a) || isDfn(b)) throw new Error('APL-SI: , expects an array, not a word');
+  const aStr = typeof a === 'string';
+  const bStr = typeof b === 'string';
+  if (aStr !== bStr) throw new Error('APL-SI: , cannot join text and numbers');
+  if (aStr) return a + b;
+  return [...toVec(a), ...toVec(b)];
+}
+
 function reduce(fn, vec) {
   if (!isVec(vec)) return vec;
   if (vec.length === 0) throw new Error('APL-SI: cannot reduce an empty vector');
   if (!REDUCE_ALLOWED.includes(fn)) {
-    throw new Error(`APL-SI: "${fn}/" reduce is not defined`);
+    throw new Error();
   }
   let acc = vec[vec.length - 1];
   for (let i = vec.length - 2; i >= 0; i--) acc = scalarDyad(fn, vec[i], acc);
