@@ -46,7 +46,7 @@ const defaultIO = {
 // The core glyphs. Do not grow this list casually: the core is what both sides
 // agree on. Everything else is built on top and proven by tests.
 
-export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞', '⍴', ',', '⌷'];
+export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞', '⍴', ',', '⌷', '<', '≤', '=', '≥', '>', '≠'];
 
 // Glyphs that take no argument: they are complete on their own. The ear listens.
 const NILADIC = ['⍞'];
@@ -66,6 +66,12 @@ export const CORE = {
   '⍴': ['shape', 'reshape'],
   ',': ['ravel', 'catenate'],
   '⌷': [null, 'index (pick)'],
+  '<': [null, 'less than'],
+  '≤': [null, 'less than or equal'],
+  '=': [null, 'equal'],
+  '≥': [null, 'greater than or equal'],
+  '>': [null, 'greater than'],
+  '≠': [null, 'not equal'],
   '◆': ['prefix sums (running total)', null], // not standard APL: this one is ours
   '⎕': ['print (the mouth)', null], // our first effect: it writes to the screen
   '⍞': ['read a line (the ear)', null], // our second effect: it takes one in from outside
@@ -226,6 +232,15 @@ function evalTokens(tokens, env, io) {
       const name = next().value;
       const right = parseExpr();
       return applyDfn(env[name], left, right, env, io);
+    }
+    // A value on the left of "/" is a filter: mask / vector keeps the elements
+    // where the mask is non-zero. (A function on the left of "/" is a reduce,
+    // which parseArray has already consumed.) The two readings share the glyph
+    // the way APL does: what sits on the left decides which one it is.
+    if (t && t.type === 'op' && t.sym === '/') {
+      next();
+      const right = parseExpr();
+      return compress(left, right);
     }
     return left;
   }
@@ -393,6 +408,12 @@ function scalarDyad(fn, x, y) {
     case '⌊': return Math.min(x, y);
     case '*': return Math.pow(x, y);
     case '|': return ((y % x) + x) % x; // APL residue: a|b is b mod a
+    case '<': return x < y ? 1 : 0;
+    case '≤': return x <= y ? 1 : 0;
+    case '=': return x === y ? 1 : 0;
+    case '≥': return x >= y ? 1 : 0;
+    case '>': return x > y ? 1 : 0;
+    case '≠': return x !== y ? 1 : 0;
     default: throw new Error(`APL-SI: "${fn}" is not a dyadic function`);
   }
 }
@@ -527,6 +548,25 @@ function pick(index, data) {
     throw new Error(`APL-SI: ⌷ index ${index} is out of range for a ${len}-element array`);
   }
   return items[pos - 1];
+}
+
+// / dyadic: compress. The left argument is a mask and the right is the array to
+// filter; elements of the right where the mask is non-zero are kept, the rest
+// are dropped, and the survivors keep their order. This is the "keep only the
+// ones that..." operation, and it pairs with the comparison glyphs that produce
+// the mask: (500 < hp) / hp keeps the healths over 500. A mask and its array
+// must be the same length; a mismatch is refused rather than trimmed to the
+// shorter one, so the mistake is visible. The left is a vector, so the mask / v
+// form is told apart from a reduce (+/ v) by what sits on the left.
+function compress(mask, data) {
+  if (isDfn(mask) || isDfn(data)) throw new Error('APL-SI: / expects an array, not a word');
+  const m = toVec(mask);
+  const items = typeof data === 'string' ? [...data] : toVec(data);
+  if (m.length !== items.length) {
+    throw new Error(`APL-SI: / needs a mask as long as its array (${m.length} vs ${items.length})`);
+  }
+  const kept = items.filter((_, i) => m[i] !== 0);
+  return typeof data === 'string' ? kept.join('') : kept;
 }
 
 function reduce(fn, vec) {
