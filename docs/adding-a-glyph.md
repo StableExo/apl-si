@@ -13,7 +13,7 @@ We learned this from a real experiment. Two models were shown one example of a m
 ## The template
 
 1. Add the glyph to `GLYPHS` and `CORE` in `src/aplsi.mjs`.
-2. Implement it in `applyMonad` (one argument) or `scalarDyad` (two). A glyph that rearranges the *shape* of its data rather than its values, like `⍴`, gets a structural helper called from `applyMonad`/`applyDyad` instead, so it does not go through the scalar-extension path.
+2. Implement it in `applyMonad` (one argument) or `scalarDyad` (two). A glyph that rearranges the *shape* of its data rather than its values, like `⍴` (shape/reshape) or `,` (ravel/catenate), gets a structural helper called from `applyMonad`/`applyDyad` instead, so it does not go through the scalar-extension path.
 3. Add a row to the core table in `README.md` with a one-line example.
 4. Add a test, using the `◆` case as the model:
 

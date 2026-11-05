@@ -50,6 +50,7 @@ The frozen core: the glyphs you get, each with a monadic (one-argument) and/or d
 | `⍳` | index generator | - | `⍳ 5` -> `1 2 3 4 5` |
 | `≢` | tally (count) | - | `≢ 1 2 3` -> `3` |
 | `⍴` | shape | reshape | `⍴ 1 2 3` -> `3` · `5 ⍴ 1 2 3` -> `1 2 3 1 2` |
+| `,` | ravel | catenate | `1 2 , 3 4` -> `1 2 3 4` · `⍴ , 5` -> `1` |
 | `◆` | prefix sums | - | `◆ 1 2 3 4` -> `1 3 6 10` |
 | `⎕` | print (the mouth) | - | `⎕ 'hello world'` -> prints it |
 | `⍞` | read a line (the ear) | - | `name ← ⍞` -> reads one line as text |
@@ -66,6 +67,7 @@ Rules:
 - `¯` marks a negative literal: `¯7` is minus seven.
 - `'text'` in single quotes is a string. A string is just an array of characters, so `≢ 'hello world'` counts `11`.
 - `⍴` is the shape. Alone it gives a value's shape as an array: `⍴ 1 2 3` is `3`, the one-element array holding the length, and `⍴ 5` is the empty array, because a scalar has rank 0. That is why `≢ ⍴ x` is the rank. With a left argument it **reshapes**, reusing the data cyclically: `5 ⍴ 1 2 3` is `1 2 3 1 2`. Text reshapes as characters. v0 is one-dimensional, so a shape naming two or more axes is refused rather than guessed: that needs the nested arrays the language does not have yet.
+- `,` is the join. Alone (ravel) it turns a value into a vector, which is what lets a lone number be joined: `5 , 6` is `5 6`, and `≢ , 5` is `1`. With a left argument (catenate) it joins two values end to end: `1 2 , 3 4` is `1 2 3 4`, and `'ab' , 'cd'` is `abcd`. It pairs with `⍴`: build a pair with `,`, shape it with `⍴`. v0 will not put text and numbers in one array, so a mixed join is refused rather than guessed at.
 - Evaluating an expression **returns** a value; it does **not** print. Only `⎕` prints. (The REPL echoes values so you can see them. That is the REPL being friendly, not the language speaking.)
 
 ## The first words: hello world

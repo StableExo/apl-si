@@ -46,7 +46,7 @@ const defaultIO = {
 // The core glyphs. Do not grow this list casually: the core is what both sides
 // agree on. Everything else is built on top and proven by tests.
 
-export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞', '⍴'];
+export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞', '⍴', ','];
 
 // Glyphs that take no argument: they are complete on their own. The ear listens.
 const NILADIC = ['⍞'];
@@ -64,6 +64,7 @@ export const CORE = {
   '⍳': ['index generator (1..n)', null],
   '≢': ['tally (count)', null],
   '⍴': ['shape', 'reshape'],
+  ',': ['ravel', 'catenate'],
   '◆': ['prefix sums (running total)', null], // not standard APL: this one is ours
   '⎕': ['print (the mouth)', null], // our first effect: it writes to the screen
   '⍞': ['read a line (the ear)', null], // our second effect: it takes one in from outside
@@ -365,6 +366,7 @@ function applyDyad(fn, a, b) {
   // Reshape is structural: it changes the shape of the data, not its values, so
   // it does not go through the scalar-extension path the arithmetic glyphs use.
   if (fn === '⍴') return reshape(a, b);
+  if (fn === ',') return catenate(a, b);
   if (typeof a === 'string' || typeof b === 'string') {
     throw new Error('APL-SI: arithmetic on text is not defined yet');
   }
@@ -409,6 +411,7 @@ function applyMonad(fn, v, io) {
   }
   if (fn === '≢') return typeof v === 'string' ? [...v].length : toVec(v).length;
   if (fn === '⍴') return shape(v);
+  if (fn === ',') return ravel(v);
   if (fn === '◆') {
     if (!isVec(v)) return v;
     let acc = 0;
@@ -474,6 +477,28 @@ function reshape(shapeArg, data) {
   const src = toVec(data);
   if (n > 0 && src.length === 0) throw new Error('APL-SI: cannot reshape an empty array');
   return Array.from({ length: n }, (_, i) => src[i % src.length]);
+}
+
+// , monadic: ravel. It turns a value into a vector. v0 has no nesting, so for a
+// vector it is the vector itself; its real work is lifting a scalar into a
+// one-element vector, which is what makes a lone value joinable: 5 , 6 is 5 6.
+function ravel(v) {
+  if (isDfn(v)) throw new Error('APL-SI: , expects an array, not a word');
+  if (typeof v === 'string') return v; // text is already a flat array of characters
+  return toVec(v);
+}
+
+// , dyadic: catenate. It joins left and right into one vector. Numbers join end
+// to end (1 2 , 3 4 is 1 2 3 4), and text joins to text ('ab' , 'cd' is 'abcd').
+// Text and numbers do not mix in v0: a mixed array has no single meaning here
+// yet, so it is refused rather than guessed at.
+function catenate(a, b) {
+  if (isDfn(a) || isDfn(b)) throw new Error('APL-SI: , expects an array, not a word');
+  const aStr = typeof a === 'string';
+  const bStr = typeof b === 'string';
+  if (aStr !== bStr) throw new Error('APL-SI: , cannot join text and numbers');
+  if (aStr) return a + b;
+  return [...toVec(a), ...toVec(b)];
 }
 
 function reduce(fn, vec) {
