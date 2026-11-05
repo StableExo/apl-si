@@ -223,3 +223,55 @@ test('a word can listen and speak', () => {
   assert.deepEqual(out, ['42']);
 });
 
+// --- the shape: ⍴ gives a value's shape and reshapes data ---
+//
+// Shape is deliberately an ARRAY, not a bare number: a vector's shape is a
+// one-element array, a scalar's is the empty array. That is what makes ≢ ⍴ x
+// the rank, and what lets a matrix have a two-element shape later without ⍴
+// ever changing meaning.
+
+test('⍴ monadic gives the shape as an array', () => {
+  assert.deepEqual(run('⍴ 1 2 3'), [3]); // a vector's shape: a one-element array
+  assert.deepEqual(run('⍴ 5'), []); // a scalar's shape: the empty array
+});
+
+test('⍴ counts the characters of text', () => {
+  assert.deepEqual(run("⍴ 'hello world'"), [11]);
+});
+
+test('≢ ⍴ x is the rank', () => {
+  assert.equal(run('≢ ⍴ 1 2 3'), 1); // a vector is rank 1
+  assert.equal(run('≢ ⍴ 5'), 0); // a scalar is rank 0
+});
+
+test('⍴ dyadic reshapes, reusing the data cyclically', () => {
+  assert.deepEqual(run('3 ⍴ 1 2 3'), [1, 2, 3]);
+  assert.deepEqual(run('5 ⍴ 1 2 3'), [1, 2, 3, 1, 2]);
+  assert.deepEqual(run('3 ⍴ 7'), [7, 7, 7]); // a scalar fills the whole shape
+  assert.deepEqual(run('0 ⍴ 1 2 3'), []);
+});
+
+test('⍴ dyadic also takes a one-element shape array', () => {
+  assert.deepEqual(run('(⍳ 1) ⍴ 1 2 3'), [1]); // ⍳ 1 is the one-element vector 1
+});
+
+test('⍴ reshapes text as characters', () => {
+  assert.equal(run("5 ⍴ 'ab'"), 'ababa');
+});
+
+test('⍴ monadic takes the whole right side, like other monadic functions', () => {
+  assert.deepEqual(run('⍴ 1 2 + 3 4'), [2]);
+});
+
+test('⍴ refuses a shape that would need nested arrays', () => {
+  assert.throws(() => run('2 3 ⍴ ⍳ 6'), /higher rank/);
+});
+
+test('⍴ refuses a negative shape', () => {
+  assert.throws(() => run('¯1 ⍴ 1 2 3'), /negative/);
+});
+
+test('⍴ refuses to reshape an empty array', () => {
+  assert.throws(() => run('3 ⍴ ⍳ 0'), /empty array/);
+});
+
