@@ -347,3 +347,55 @@ test('⌷ composes with ≢ and ◆', () => {
   assert.equal(run('(≢ 7 8 9) ⌷ 7 8 9'), 9); // the last element, counted
 });
 
+// --- the tests: < ≤ = ≥ > ≠ compare and give a 0/1 mask ---
+//
+// Each comparison is a dyadic scalar function like +, so it broadcasts over a
+// vector and gives 1 where true, 0 where false. The result is a mask, which is
+// what the compress form of / consumes.
+
+test('comparisons give 1 or 0, one to each element', () => {
+  assert.equal(run('3 < 5'), 1);
+  assert.equal(run('5 < 3'), 0);
+  assert.equal(run('2 ≤ 2'), 1);
+  assert.equal(run('3 = 3'), 1);
+  assert.equal(run('3 = 4'), 0);
+  assert.equal(run('4 ≥ 2'), 1);
+  assert.equal(run('2 > 3'), 0);
+  assert.equal(run('3 ≠ 4'), 1);
+});
+
+test('comparisons broadcast a scalar over a vector', () => {
+  assert.deepEqual(run('500 < 120 480 900 250'), [0, 0, 1, 0]);
+  assert.deepEqual(run('2 = 1 2 3'), [0, 1, 0]);
+});
+
+test('comparisons are not monadic', () => {
+  assert.throws(() => run('< 5'), /not a monadic function/);
+});
+
+// --- the filter: mask / vector keeps the elements the mask picks ---
+
+test('/ with a value on its left filters', () => {
+  assert.deepEqual(run('1 0 1 0 / 10 20 30 40'), [10, 30]);
+  assert.deepEqual(run('1 1 1 / 7 8 9'), [7, 8, 9]); // an all-1 mask keeps everything
+  assert.deepEqual(run('0 0 0 / 7 8 9'), []); // an all-0 mask keeps nothing
+});
+
+test('/ filters text as text', () => {
+  assert.equal(run("1 0 1 / 'abc'"), 'ac');
+});
+
+test('/ refuses a mask that is the wrong length', () => {
+  assert.throws(() => run('1 0 / 10 20 30'), /mask as long as its array/);
+});
+
+test('/ still reduces when a function is on its left', () => {
+  assert.equal(run('+/ 1 2 3 4'), 10); // the two readings of / do not collide
+  assert.equal(run('⌈/ ◆ 3 1 4 1 5'), 14);
+});
+
+test('comparison and filter together answer the README example', () => {
+  // "keep only the ones over 500, and total them"
+  assert.equal(run('+/ (500 < 120 480 900 250) / 120 480 900 250'), 900);
+});
+
