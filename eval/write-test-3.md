@@ -99,7 +99,61 @@ number, because it is for text.
 - **Item 9 tests reading, not writing.** It asks the model to know what `⍎`
   refuses, which is a rule the prompt states.
 
-## Round 1 results
+## Round 1 results (2026-11-05)
 
-_(to fill in: paste the prompt to each model, run every line through
-`src/aplsi.mjs`, and record here, the way rounds 1 of the earlier tests do.)_
+One model, cold. Every line run through `src/aplsi.mjs`.
+
+| # | Key | Sonnet 5.5 |
+|---|-----|------------|
+| 1 | `8 9 10` | `1 + ⍎ '7 8 9'` ✅ |
+| 2 | `42` | `⍎ '42'` ✅ |
+| 3 | sum of stdin | `+/ ⍎ ⍞` ✅ |
+| 4 | sum of stdin over 10 | unsure ⚠️ |
+| 5 | `900` | unsure ❌ |
+| 6 | `3` | `≢ ⍎ '5 6 2'` ✅ |
+| 7 | `9` | `⌈/ ⍎ '3 9 4'` ✅ |
+| 8 | label + total | unsure ⚠️ |
+| 9 | refused | unsure ❌ |
+
+**5 clean, 1 solvable miss, and two "unsure" answers that are right about the
+language.** This round turned out to say more about the test than the model.
+
+### What round 1 exposed
+
+The prompt's "glyphs you have" list is just `GLYPHS`. That set omits two things
+the language actually has, and the reading test already uses:
+
+- **`←` assignment** — `n ← ⍎ ⍞` works.
+- **named dfns** — `f ← {+/ ⍵}` then `f v` works (a bare `{...}` applied to an
+  expression does not; the dfn has to be bound to a name first).
+
+With those left out, **items 4 and 8 have no single-line answer**, which is
+exactly what the model said:
+
+- **Item 4** uses the typed line twice. With `←` it is two lines (`n ← ⍎ ⍞`, then
+  `+/ (10 < n) / n`), not one. There is no one-line form: `{+/ (10<⍵)/⍵} ⍎ ⍞`
+  errors with `arithmetic on text is not defined yet`, and `+/ (10 < ⍎ ⍞) / ⍎ ⍞`
+  reads *two* lines — a different first line from the second, so it is wrong.
+- **Item 8** wants a label with a computed total. `⎕ 'Total:' 108` prints fine,
+  but the second thing on the line has to be a plain value; `⎕ 'Total: ' +/ ⍎ ⍞`
+  errors with `expected a value`.
+
+So the model's two reasoned "unsure" answers are correct diagnoses of a hole in
+*this test*, not failures. Item 5, by contrast, is solvable (it just needs
+parentheses, `(500 < ⍎ '...') / ⍎ '...'` → `900`) and item 9 is answerable by
+reasoning from "⍎ is for text" (`⍎ 42` is refused), so those two misses are the
+model's.
+
+### The language gaps this found
+
+The round did its job: it surfaced two things wishful thinking had hidden.
+
+1. **You cannot reuse a read inline.** `⍞` consumes a line and there is no way to
+   hold it without a separate `←` statement. Reading a line and asking two
+   questions of it is awkward.
+2. **You cannot hand a computed value to a dfn or to `⎕`.** Only a name or a
+   literal goes in those positions, so a dfn that summarises an expression, or a
+   labelled print of a computed total, cannot be written in one line.
+
+Both are worth fixing, and both are more interesting than the glyphs the round
+was meant to test.
