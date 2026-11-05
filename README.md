@@ -28,10 +28,10 @@ So the exchange is wasteful on both ends. APL-SI asks: what if the currency betw
 
 ```
 hp ← 120 480 900 250
-+/ hp
++/ (500 < hp) / hp
 ```
 
-Read it as: *store the healths, then sum them.*
+Read it as: *store the healths, keep the ones over 500, then sum those.*
 
 ## The frozen core (v0)
 
@@ -52,13 +52,19 @@ The frozen core: the glyphs you get, each with a monadic (one-argument) and/or d
 | `⍴` | shape | reshape | `⍴ 1 2 3` -> `3` · `5 ⍴ 1 2 3` -> `1 2 3 1 2` |
 | `,` | ravel | catenate | `1 2 , 3 4` -> `1 2 3 4` · `⍴ , 5` -> `1` |
 | `⌷` | - | index (pick) | `2 ⌷ 10 20 30` -> `20` · `¯1 ⌷ 10 20 30` -> `30` |
+| `<` | - | less than | `500 < 120 480 900 250` -> `0 0 1 0` |
+| `≤` | - | less than or equal | `3 ≤ 3` -> `1` |
+| `=` | - | equal | `2 = 1 2 3` -> `0 1 0` |
+| `≥` | - | greater than or equal | `4 ≥ 2` -> `1` |
+| `>` | - | greater than | `2 > 3` -> `0` |
+| `≠` | - | not equal | `3 ≠ 4` -> `1` |
 | `◆` | prefix sums | - | `◆ 1 2 3 4` -> `1 3 6 10` |
 | `⎕` | print (the mouth) | - | `⎕ 'hello world'` -> prints it |
 | `⍞` | read a line (the ear) | - | `name ← ⍞` -> reads one line as text |
 
 `◆` is the first glyph that is **not** a standard APL primitive. It is ours, which is the point: an example teaches it, a test freezes it. See `docs/adding-a-glyph.md` for the template every new glyph follows.
 
-Plus the `/` operator, which folds a vector with the function on its left: `+/` (sum), `×/` (product), `⌈/` (max), `⌊/` (min), `-/`, `÷/`.
+Plus the `/` operator, which does two jobs depending on what sits on its left. After a function it **folds** a vector: `+/` (sum), `×/` (product), `⌈/` (max), `⌊/` (min), `-/`, `÷/`. After a value it **filters**: `mask / vector` keeps the elements where the mask is non-zero, so `1 0 1 0 / 10 20 30 40` is `10 30`.
 
 Rules:
 - Evaluation is **right to left**: `2 × 3 + 4` is `2 × (3 + 4)`.
@@ -70,6 +76,8 @@ Rules:
 - `⍴` is the shape. Alone it gives a value's shape as an array: `⍴ 1 2 3` is `3`, the one-element array holding the length, and `⍴ 5` is the empty array, because a scalar has rank 0. That is why `≢ ⍴ x` is the rank. With a left argument it **reshapes**, reusing the data cyclically: `5 ⍴ 1 2 3` is `1 2 3 1 2`. Text reshapes as characters. v0 is one-dimensional, so a shape naming two or more axes is refused rather than guessed: that needs the nested arrays the language does not have yet.
 - `,` is the join. Alone (ravel) it turns a value into a vector, which is what lets a lone number be joined: `5 , 6` is `5 6`, and `≢ , 5` is `1`. With a left argument (catenate) it joins two values end to end: `1 2 , 3 4` is `1 2 3 4`, and `'ab' , 'cd'` is `abcd`. It pairs with `⍴`: build a pair with `,`, shape it with `⍴`. v0 will not put text and numbers in one array, so a mixed join is refused rather than guessed at.
 - `⌷` is the index. It reaches one element back out of an array: `2 ⌷ 10 20 30` is `20`. Positions count from one, the way APL does, so `1 ⌷ v` is the first element; a negative index counts back from the end, so `¯1 ⌷ v` is the last. A string is an array of characters, so `2 ⌷ 'abc'` is `b`. An index outside the array is refused, not wrapped. This is what makes `¯1 ⌷ ◆ 3 1 4 1 5` (the final running total) a single line.
+- `< ≤ = ≥ > ≠` **compare**. Each is a dyadic scalar function like `+`, so it broadcasts and gives a mask of `1` (true) and `0` (false): `500 < 120 480 900 250` is `0 0 1 0`, and `2 = 1 2 3` is `0 1 0`. None of them have a monadic meaning.
+- `/` **filters** when a value is on its left. `mask / v` keeps the elements of `v` where the mask is non-zero, in order: `1 0 1 0 / 10 20 30 40` is `10 30`, and `1 0 1 / 'abc'` is `ac`. The mask must be as long as the array; a mismatch is refused. Together with the comparisons this is "keep only the ones that...": `+/ (500 < hp) / hp` totals the values over 500. The same glyph still folds when a function is on its left (`+/`), so the left side decides which one you get.
 - Evaluating an expression **returns** a value; it does **not** print. Only `⎕` prints. (The REPL echoes values so you can see them. That is the REPL being friendly, not the language speaking.)
 
 ## The first words: hello world
@@ -153,6 +161,20 @@ Positions count from one, so `1 ⌷ v` is the first; `¯1 ⌷ v` is the last, co
 ```
 
 That is the shape of a language filling itself in: a glyph whose absence a reader can point at, added with one example and one test.
+
+## Keeping some: compare and filter
+
+The opening example of this README is *"keep only the ones over 500, and total them."* For a while the language could not say it: there was no way to test a value and no way to keep the ones that passed.
+
+Two pieces close that. The comparison glyphs `< ≤ = ≥ > ≠` each give a mask of `1`s and `0`s, and `/` with a mask on its left keeps the elements the mask picks:
+
+```
+500 < 120 480 900 250        → 0 0 1 0
+1 0 1 0 / 10 20 30 40        → 10 30
++/ (500 < hp) / hp           → 900
+```
+
+Read that last line right to left: compare each health to 500, keep the ones that pass, sum them. The comparisons are ordinary dyadic scalar functions, so they broadcast the way `+` does; the filter is the same `/` that folds a vector, told apart only by what sits on its left. That is APL's habit of letting one glyph carry two meanings, and it is why a two-line idea stays one line.
 
 ## Run it
 
