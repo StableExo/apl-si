@@ -51,6 +51,7 @@ The frozen core: the glyphs you get, each with a monadic (one-argument) and/or d
 | `≢` | tally (count) | - | `≢ 1 2 3` -> `3` |
 | `⍴` | shape | reshape | `⍴ 1 2 3` -> `3` · `5 ⍴ 1 2 3` -> `1 2 3 1 2` |
 | `,` | ravel | catenate | `1 2 , 3 4` -> `1 2 3 4` · `⍴ , 5` -> `1` |
+| `⌷` | - | index (pick) | `2 ⌷ 10 20 30` -> `20` · `¯1 ⌷ 10 20 30` -> `30` |
 | `◆` | prefix sums | - | `◆ 1 2 3 4` -> `1 3 6 10` |
 | `⎕` | print (the mouth) | - | `⎕ 'hello world'` -> prints it |
 | `⍞` | read a line (the ear) | - | `name ← ⍞` -> reads one line as text |
@@ -68,6 +69,7 @@ Rules:
 - `'text'` in single quotes is a string. A string is just an array of characters, so `≢ 'hello world'` counts `11`.
 - `⍴` is the shape. Alone it gives a value's shape as an array: `⍴ 1 2 3` is `3`, the one-element array holding the length, and `⍴ 5` is the empty array, because a scalar has rank 0. That is why `≢ ⍴ x` is the rank. With a left argument it **reshapes**, reusing the data cyclically: `5 ⍴ 1 2 3` is `1 2 3 1 2`. Text reshapes as characters. v0 is one-dimensional, so a shape naming two or more axes is refused rather than guessed: that needs the nested arrays the language does not have yet.
 - `,` is the join. Alone (ravel) it turns a value into a vector, which is what lets a lone number be joined: `5 , 6` is `5 6`, and `≢ , 5` is `1`. With a left argument (catenate) it joins two values end to end: `1 2 , 3 4` is `1 2 3 4`, and `'ab' , 'cd'` is `abcd`. It pairs with `⍴`: build a pair with `,`, shape it with `⍴`. v0 will not put text and numbers in one array, so a mixed join is refused rather than guessed at.
+- `⌷` is the index. It reaches one element back out of an array: `2 ⌷ 10 20 30` is `20`. Positions count from one, the way APL does, so `1 ⌷ v` is the first element; a negative index counts back from the end, so `¯1 ⌷ v` is the last. A string is an array of characters, so `2 ⌷ 'abc'` is `b`. An index outside the array is refused, not wrapped. This is what makes `¯1 ⌷ ◆ 3 1 4 1 5` (the final running total) a single line.
 - Evaluating an expression **returns** a value; it does **not** print. Only `⎕` prints. (The REPL echoes values so you can see them. That is the REPL being friendly, not the language speaking.)
 
 ## The first words: hello world
@@ -131,6 +133,26 @@ name ← ⍞
 Run `npm run echo` with a line typed or piped in, and it answers. That is the whole circle: ask, listen, answer.
 
 The ear returns **text**, so it cannot yet be summed or averaged. Turning heard text into numbers is its own future layer, and it is exactly where the next work goes.
+
+## Reaching in: getting one element
+
+`⍴` and `,` build arrays, but for a while there was no way to pull a single value back *out* of one. A cold-read test found exactly that gap: asked for the last element of a list, a model answered that the notation had no way to reach it.
+
+`⌷` is the index. It takes a position on the left and an array on the right:
+
+```
+2 ⌷ 10 20 30      → 20
+¯1 ⌷ 10 20 30     → 30
+2 ⌷ 'abc'         → b
+```
+
+Positions count from one, so `1 ⌷ v` is the first; `¯1 ⌷ v` is the last, counting back from the end. An index outside the array is refused, not wrapped, so an off-by-one is loud instead of silent. With it, "prefix-sum a list and keep the final total" is one line:
+
+```
+¯1 ⌷ ◆ 3 1 4 1 5   → 14
+```
+
+That is the shape of a language filling itself in: a glyph whose absence a reader can point at, added with one example and one test.
 
 ## Run it
 
