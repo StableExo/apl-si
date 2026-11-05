@@ -109,3 +109,4 @@ Both 9/9. Two honest readings:
    told apart from recall-by-luck. This version of the test cannot separate
    "reads APL-SI" from "remembers APL". A test that makes a model *write* code
    and run it would separate them, since the code either runs or it does not.
+   That is `write-test.md`, which does exactly this and did separate them.
