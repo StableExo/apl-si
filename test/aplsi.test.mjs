@@ -275,3 +275,39 @@ test('⍴ refuses to reshape an empty array', () => {
   assert.throws(() => run('3 ⍴ ⍳ 0'), /empty array/);
 });
 
+// --- the join: , lifts a scalar into a vector and joins two values into one ---
+//
+// Monadic , is ravel: it turns a value into a vector. With no nesting in v0 its
+// real work is lifting a scalar, so 5 , 6 can join. Dyadic , is catenate: two
+// values end to end. Text joins to text; text and numbers are refused, not mixed.
+
+test(', monadic ravels a value into a vector', () => {
+  assert.deepEqual(run(', 5'), [5]); // a scalar lifted into a one-element vector
+  assert.deepEqual(run(', 1 2 3'), [1, 2, 3]); // a vector is already flat
+  assert.equal(run('≢ , 5'), 1); // ≢ , 5 is the rank made explicit
+});
+
+test(', monadic ravels text as text', () => {
+  assert.equal(run(", 'ab'"), 'ab');
+});
+
+test(', dyadic catenates two values into one vector', () => {
+  assert.deepEqual(run('1 , 2'), [1, 2]);
+  assert.deepEqual(run('1 2 , 3 4'), [1, 2, 3, 4]);
+  assert.deepEqual(run('1 2 , 3'), [1, 2, 3]); // a scalar joins on the right
+  assert.deepEqual(run(', 5 , 6'), [5, 6]); // ravel makes each side joinable
+});
+
+test(', catenates text as text', () => {
+  assert.equal(run("'ab' , 'cd'"), 'abcd');
+});
+
+test(', refuses to mix text and numbers', () => {
+  assert.throws(() => run("'ab' , 1 2"), /cannot join text and numbers/);
+});
+
+test(', and ⍴ fit together', () => {
+  assert.deepEqual(run('⍴ , 5'), [1]); // the shape of a raveled scalar
+  assert.deepEqual(run('3 ⍴ 1 , 2'), [1, 2, 1]); // build a pair, then reshape it
+});
+
