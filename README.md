@@ -61,6 +61,7 @@ The frozen core: the glyphs you get, each with a monadic (one-argument) and/or d
 | `◆` | prefix sums | - | `◆ 1 2 3 4` -> `1 3 6 10` |
 | `⎕` | print (the mouth) | - | `⎕ 'hello world'` -> prints it |
 | `⍞` | read a line (the ear) | - | `name ← ⍞` -> reads one line as text |
+| `⍎` | parse (text to numbers) | - | `⍎ '5 6 2'` -> `5 6 2` |
 
 `◆` is the first glyph that is **not** a standard APL primitive. It is ours, which is the point: an example teaches it, a test freezes it. See `docs/adding-a-glyph.md` for the template every new glyph follows.
 
@@ -78,6 +79,7 @@ Rules:
 - `⌷` is the index. It reaches one element back out of an array: `2 ⌷ 10 20 30` is `20`. Positions count from one, the way APL does, so `1 ⌷ v` is the first element; a negative index counts back from the end, so `¯1 ⌷ v` is the last. A string is an array of characters, so `2 ⌷ 'abc'` is `b`. An index outside the array is refused, not wrapped. This is what makes `¯1 ⌷ ◆ 3 1 4 1 5` (the final running total) a single line.
 - `< ≤ = ≥ > ≠` **compare**. Each is a dyadic scalar function like `+`, so it broadcasts and gives a mask of `1` (true) and `0` (false): `500 < 120 480 900 250` is `0 0 1 0`, and `2 = 1 2 3` is `0 1 0`. None of them have a monadic meaning.
 - `/` **filters** when a value is on its left. `mask / v` keeps the elements of `v` where the mask is non-zero, in order: `1 0 1 0 / 10 20 30 40` is `10 30`, and `1 0 1 / 'abc'` is `ac`. The mask must be as long as the array; a mismatch is refused. Together with the comparisons this is "keep only the ones that...": `+/ (500 < hp) / hp` totals the values over 500. The same glyph still folds when a function is on its left (`+/`), so the left side decides which one you get.
+- `⍎` **parses**. The ear hands back characters, and characters cannot be summed; `⍎` reads text and gives the numbers it spells: `⍎ '5 6 2'` is `5 6 2` and `⍎ '3.5 ¯2'` is `3.5 ¯2`. Numbers in the text are separated by spaces, and a lone number comes back as a scalar (`⍎ '42'` is `42`). Anything that is not a plain number is refused, so a typo is loud. It is what makes heard text computable: `+/ ⍎ ⍞` sums a line someone typed.
 - Evaluating an expression **returns** a value; it does **not** print. Only `⎕` prints. (The REPL echoes values so you can see them. That is the REPL being friendly, not the language speaking.)
 
 ## The first words: hello world
@@ -140,7 +142,27 @@ name ← ⍞
 
 Run `npm run echo` with a line typed or piped in, and it answers. That is the whole circle: ask, listen, answer.
 
-The ear returns **text**, so it cannot yet be summed or averaged. Turning heard text into numbers is its own future layer, and it is exactly where the next work goes.
+The ear returns **text**, and on its own text cannot be summed or averaged. Turning what it heard into numbers is the next piece, below.
+
+## Making it count: parsing what the ear heard
+
+A circle that can only repeat what it heard is not much of a conversation. The ear hands back characters, and characters do not add. The missing piece was a way to read numbers out of text, which is `⍎`:
+
+```
+⍎ '42'          → 42
+⍎ '5 6 2'       → 5 6 2
++/ ⍎ ⍞          → sums a line someone typed
+```
+
+`⍎` takes text and gives back the value it spells: one number becomes a scalar, several separated by spaces become a vector. It refuses anything that is not a plain number, so a stray word is an error rather than a zero quietly dropped in. `⎕`, `⍞` and `⍎` are the three doors of the language: `⎕` speaks out, `⍞` listens in, and `⍎` turns what was heard back into something you can compute with.
+
+Run `npm run sum` with numbers piped in, and it totals them:
+
+```
+printf '4 8 15 16 23 42\n' | npm run sum   → the total is 108
+```
+
+That is the loop closed: a program that asks, listens, *computes*, and answers.
 
 ## Reaching in: getting one element
 

@@ -399,3 +399,38 @@ test('comparison and filter together answer the README example', () => {
   assert.equal(run('+/ (500 < 120 480 900 250) / 120 480 900 250'), 900);
 });
 
+// --- the parse: ⍎ turns the ear's text back into values ---
+//
+// The ear (⍞) hands back characters, and characters cannot be summed. ⍎ reads a
+// string and gives the numbers it spells, so heard text becomes computable. It
+// refuses anything that is not a plain number or a space-separated list of them.
+
+test('⍎ reads one number from text', () => {
+  assert.equal(run("⍎ '42'"), 42);
+  assert.equal(run("⍎ '3.5'"), 3.5);
+  assert.equal(run("⍎ '¯2'"), -2);
+});
+
+test('⍎ reads a vector from text', () => {
+  assert.deepEqual(run("⍎ '5 6 2'"), [5, 6, 2]);
+  assert.deepEqual(run("⍎ '3.5 ¯2 0'"), [3.5, -2, 0]);
+  assert.deepEqual(run("⍎ '  1   2 '"), [1, 2]); // extra spaces are fine
+});
+
+test('⍎ makes heard text computable', () => {
+  assert.equal(run("+/ ⍎ '4 8 15 16 23 42'"), 108);
+  // what the ear reads in can be parsed and then worked with
+  const io = { input: () => '120 480 900 250' };
+  assert.equal(run('+/ ⍎ ⍞', {}, io), 1750);
+});
+
+test('⍎ refuses text that is not numbers', () => {
+  assert.throws(() => run("⍎ 'hello'"), /cannot read "hello" as a number/);
+  assert.throws(() => run("⍎ '1 x 3'"), /cannot read "x" as a number/);
+  assert.throws(() => run("⍎ ''"), /found no numbers/);
+});
+
+test('⍎ refuses a value that is already a number', () => {
+  assert.throws(() => run('⍎ 5'), /expects text/);
+});
+

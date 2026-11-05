@@ -46,7 +46,7 @@ const defaultIO = {
 // The core glyphs. Do not grow this list casually: the core is what both sides
 // agree on. Everything else is built on top and proven by tests.
 
-export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞', '⍴', ',', '⌷', '<', '≤', '=', '≥', '>', '≠'];
+export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞', '⍎', '⍴', ',', '⌷', '<', '≤', '=', '≥', '>', '≠'];
 
 // Glyphs that take no argument: they are complete on their own. The ear listens.
 const NILADIC = ['⍞'];
@@ -75,6 +75,7 @@ export const CORE = {
   '◆': ['prefix sums (running total)', null], // not standard APL: this one is ours
   '⎕': ['print (the mouth)', null], // our first effect: it writes to the screen
   '⍞': ['read a line (the ear)', null], // our second effect: it takes one in from outside
+  '⍎': ['parse (text to numbers)', null], // turns the ear's characters back into values
 };
 
 // The `/` operator reduces a vector with the function on its left: +/ ×/ -/ ÷/ ⌈/ ⌊/
@@ -433,6 +434,7 @@ function applyMonad(fn, v, io) {
     return Array.from({ length: n }, (_, i) => i + 1);
   }
   if (fn === '≢') return typeof v === 'string' ? [...v].length : toVec(v).length;
+  if (fn === '⍎') return parseText(v);
   if (fn === '⍴') return shape(v);
   if (fn === ',') return ravel(v);
   if (fn === '◆') {
@@ -456,6 +458,26 @@ function scalarMonad(fn, x) {
     case '|': return Math.abs(x);
     default: throw new Error(`APL-SI: "${fn}" is not a monadic function`);
   }
+}
+
+// ⍎ monadic: parse. The mirror of ⎕ and ⍞. Where the mouth writes text out and
+// the ear reads text in, ⍎ turns that text back into a value. The ear hands back
+// characters, and characters cannot be summed; ⍎ is what makes heard text
+// computable: ⍎ '5 6 2' is 5 6 2, and +/ ⍎ ⍞ sums a line someone typed. It reads
+// the numbers it is given, one or many, separated by spaces, and refuses anything
+// that is not a plain number, so a typo is loud instead of silently dropped.
+function parseText(v) {
+  if (isDfn(v)) throw new Error('APL-SI: ⍎ expects text, not a word');
+  if (typeof v !== 'string') throw new Error('APL-SI: ⍎ expects text');
+  const parts = v.trim().split(/\s+/).filter((s) => s.length > 0);
+  if (parts.length === 0) throw new Error('APL-SI: ⍎ found no numbers');
+  const nums = parts.map((p) => {
+    if (!/^¯?\d+(\.\d+)?$/.test(p)) {
+      throw new Error(`APL-SI: ⍎ cannot read "${p}" as a number`);
+    }
+    return parseFloat(p.replace('¯', '-'));
+  });
+  return nums.length === 1 ? nums[0] : nums;
 }
 
 // ⍴ monadic: the shape of a value, itself an array. A vector's shape is a
