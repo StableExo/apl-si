@@ -46,7 +46,7 @@ const defaultIO = {
 // The core glyphs. Do not grow this list casually: the core is what both sides
 // agree on. Everything else is built on top and proven by tests.
 
-export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞', '⍴', ','];
+export const GLYPHS = ['+', '-', '×', '÷', '⌈', '⌊', '|', '*', '⍳', '≢', '◆', '⎕', '⍞', '⍴', ',', '⌷'];
 
 // Glyphs that take no argument: they are complete on their own. The ear listens.
 const NILADIC = ['⍞'];
@@ -65,6 +65,7 @@ export const CORE = {
   '≢': ['tally (count)', null],
   '⍴': ['shape', 'reshape'],
   ',': ['ravel', 'catenate'],
+  '⌷': [null, 'index (pick)'],
   '◆': ['prefix sums (running total)', null], // not standard APL: this one is ours
   '⎕': ['print (the mouth)', null], // our first effect: it writes to the screen
   '⍞': ['read a line (the ear)', null], // our second effect: it takes one in from outside
@@ -367,6 +368,7 @@ function applyDyad(fn, a, b) {
   // it does not go through the scalar-extension path the arithmetic glyphs use.
   if (fn === '⍴') return reshape(a, b);
   if (fn === ',') return catenate(a, b);
+  if (fn === '⌷') return pick(a, b);
   if (typeof a === 'string' || typeof b === 'string') {
     throw new Error('APL-SI: arithmetic on text is not defined yet');
   }
@@ -499,6 +501,32 @@ function catenate(a, b) {
   if (aStr !== bStr) throw new Error('APL-SI: , cannot join text and numbers');
   if (aStr) return a + b;
   return [...toVec(a), ...toVec(b)];
+}
+
+// ⌷ dyadic: index (pick). The left argument says which element to take from the
+// right. It is the one operation the notation was missing: until now you could
+// build a vector with , and ⍴ but not reach a single value back out of it.
+// Following APL, positions are counted from one, so 1 ⌷ v is the first element
+// and 3 ⌷ v the third; a negative index counts back from the end, so ¯1 ⌷ v is
+// the last. Index 0 and anything past the end are refused, not wrapped, so an
+// off-by-one shows up as an error instead of a quietly wrong answer. A string is
+// an array of characters, so 2 ⌷ 'abc' is 'b'.
+function pick(index, data) {
+  if (isDfn(index) || isDfn(data)) throw new Error('APL-SI: ⌷ expects an array, not a word');
+  if (isVec(index)) throw new Error('APL-SI: ⌷ index must be a single number');
+  if (typeof index !== 'number' || !Number.isInteger(index)) {
+    throw new Error('APL-SI: ⌷ index must be a whole number');
+  }
+
+  const items = typeof data === 'string' ? [...data] : toVec(data);
+  const len = items.length;
+  // APL index origin is 1: position 1 is the first element and position len the
+  // last. A negative index counts back from the end, so ¯1 lands on the last.
+  const pos = index < 0 ? len + index + 1 : index;
+  if (pos < 1 || pos > len) {
+    throw new Error(`APL-SI: ⌷ index ${index} is out of range for a ${len}-element array`);
+  }
+  return items[pos - 1];
 }
 
 function reduce(fn, vec) {
